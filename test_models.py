@@ -21,8 +21,12 @@ ROOT = Path(__file__).resolve().parent
 class ChestModelsTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.models = [json.loads((ROOT / f"fortnite_chest_{pose}.bbmodel").read_text())
-                      for pose in ("closed", "open")]
+        cls.models = [json.loads((ROOT / f"{name}.bbmodel").read_text())
+                      for name in ("Regular_chest", "Regular_chest_open")]
+
+    def test_project_names(self):
+        self.assertEqual([model["name"] for model in self.models],
+                         ["Regular_chest", "Regular_chest_open"])
 
     def test_both_poses_are_the_same_chest(self):
         closed, opened = copy.deepcopy(self.models)
@@ -107,9 +111,9 @@ class ChestModelsTest(unittest.TestCase):
         self.assertLess(z, gen.HINGE[2])
 
     def test_archive_contains_current_deliverables(self):
-        with zipfile.ZipFile(ROOT / "fortnite_chest.zip") as archive:
+        with zipfile.ZipFile(ROOT / "Regular_chest.zip") as archive:
             self.assertIsNone(archive.testzip())
-            expected = ["fortnite_chest_closed.bbmodel", "fortnite_chest_open.bbmodel",
+            expected = ["Regular_chest.bbmodel", "Regular_chest_open.bbmodel",
                         "chest_atlas.png", "preview.png", "README.md"]
             self.assertEqual(sorted(archive.namelist()), sorted(expected))
             for name in expected:

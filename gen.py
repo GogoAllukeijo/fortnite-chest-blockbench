@@ -248,7 +248,7 @@ class Model:
             })
         return {
             "meta": {"format_version": "4.10", "model_format": "free", "box_uv": False},
-            "name": "fortnite_chest_open" if opened else "fortnite_chest_closed",
+            "name": "Regular_chest_open" if opened else "Regular_chest",
             "resolution": {"width": SIZE, "height": SIZE},
             "elements": self.elements, "outliner": outliner,
             "textures": [{
@@ -435,10 +435,10 @@ def main():
     model = build()
     names = []
     for opened in (False, True):
-        name = f"fortnite_chest_{'open' if opened else 'closed'}.bbmodel"
+        name = f"Regular_chest{'_open' if opened else ''}.bbmodel"
         (ROOT / name).write_text(json.dumps(model.export(opened, texture), indent=2) + "\n", encoding="utf-8")
         names.append(name)
-    with zipfile.ZipFile(ROOT / "fortnite_chest.zip", "w", zipfile.ZIP_DEFLATED) as archive:
+    with zipfile.ZipFile(ROOT / "Regular_chest.zip", "w", zipfile.ZIP_DEFLATED) as archive:
         for name in names + ["chest_atlas.png", "preview.png", "README.md"]:
             entry = zipfile.ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0))
             entry.compress_type = zipfile.ZIP_DEFLATED

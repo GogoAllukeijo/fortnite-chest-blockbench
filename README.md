@@ -1,4 +1,4 @@
-# Golden Oak Chest - Blockbench
+# Regular_chest - Blockbench
 
 Original, stylized wooden loot chest inspired by colorful adventure games.
 Not an official Fortnite asset and not extracted from any game.
@@ -7,10 +7,10 @@ Not an official Fortnite asset and not extracted from any game.
 
 ## Lataa / Download
 
-[Download both models + textures (ZIP)](https://github.com/GogoAllukeijo/fortnite-chest-blockbench/raw/refs/heads/main/fortnite_chest.zip)
+[Download both models + textures (ZIP)](https://github.com/GogoAllukeijo/fortnite-chest-blockbench/raw/refs/heads/main/Regular_chest.zip)
 
-- `fortnite_chest_closed.bbmodel` - closed chest.
-- `fortnite_chest_open.bbmodel` - the same chest with its lid opened 105 degrees.
+- `Regular_chest.bbmodel` - closed chest.
+- `Regular_chest_open.bbmodel` - the same chest with its lid opened 105 degrees.
 - `chest_atlas.png` - hand-authored procedural 512 x 512 wood, brass and treasure atlas.
 - `preview.png` - both actual models rendered in Blockbench.
 
