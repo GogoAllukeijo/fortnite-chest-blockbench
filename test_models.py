@@ -10,7 +10,7 @@ from pathlib import Path
 import unittest
 import zipfile
 
-from PIL import Image
+from PIL import Image, ImageChops
 
 import gen
 
@@ -19,14 +19,19 @@ ROOT = Path(__file__).resolve().parent
 
 
 class ChestModelsTest(unittest.TestCase):
+    epic = False
+    prefix = "Regular_chest"
+    texture_name = "chest_atlas.png"
+    preview_name = "preview.png"
+
     @classmethod
     def setUpClass(cls):
         cls.models = [json.loads((ROOT / f"{name}.bbmodel").read_text())
-                      for name in ("Regular_chest", "Regular_chest_open")]
+                      for name in (cls.prefix, cls.prefix + "_open")]
 
     def test_project_names(self):
         self.assertEqual([model["name"] for model in self.models],
-                         ["Regular_chest", "Regular_chest_open"])
+                         [self.prefix, self.prefix + "_open"])
 
     def test_both_poses_are_the_same_chest(self):
         closed, opened = copy.deepcopy(self.models)
@@ -55,8 +60,9 @@ class ChestModelsTest(unittest.TestCase):
             self.assertEqual(len(grouped), len(set(grouped)))
 
     def test_embedded_texture_matches_atlas(self):
-        texture = (ROOT / "chest_atlas.png").read_bytes()
+        texture = (ROOT / self.texture_name).read_bytes()
         for model in self.models:
+            self.assertEqual(model["textures"][0]["name"], self.texture_name)
             self.assertEqual(model["meta"]["model_format"], "free")
             self.assertEqual(model["resolution"], {"width": 512, "height": 512})
             data = base64.b64decode(model["textures"][0]["source"].split(",", 1)[1])
@@ -111,19 +117,46 @@ class ChestModelsTest(unittest.TestCase):
         self.assertLess(z, gen.HINGE[2])
 
     def test_archive_contains_current_deliverables(self):
-        with zipfile.ZipFile(ROOT / "Regular_chest.zip") as archive:
+        with zipfile.ZipFile(ROOT / f"{self.prefix}.zip") as archive:
             self.assertIsNone(archive.testzip())
-            expected = ["Regular_chest.bbmodel", "Regular_chest_open.bbmodel",
-                        "chest_atlas.png", "preview.png", "README.md"]
+            expected = [f"{self.prefix}.bbmodel", f"{self.prefix}_open.bbmodel",
+                        self.texture_name, self.preview_name, "README.md"]
             self.assertEqual(sorted(archive.namelist()), sorted(expected))
             for name in expected:
                 self.assertEqual(archive.read(name), (ROOT / name).read_bytes())
 
     def test_generation_is_reproducible(self):
-        self.assertEqual(hashlib.sha256(gen.atlas()).digest(),
-                         hashlib.sha256((ROOT / "chest_atlas.png").read_bytes()).digest())
-        generated = gen.build().export(False, gen.atlas())
+        self.assertEqual(hashlib.sha256(gen.atlas(self.epic)).digest(),
+                         hashlib.sha256((ROOT / self.texture_name).read_bytes()).digest())
+        generated = gen.build().export(False, gen.atlas(self.epic), self.epic)
         self.assertEqual(generated, self.models[0])
+
+
+class EpicChestModelsTest(ChestModelsTest):
+    epic = True
+    prefix = "Epic_chest"
+    texture_name = "epic_chest_atlas.png"
+    preview_name = "epic_preview.png"
+
+    def test_epic_preserves_regular_geometry(self):
+        for opened, model in zip((False, True), self.models):
+            name = "Regular_chest_open.bbmodel" if opened else "Regular_chest.bbmodel"
+            regular = json.loads((ROOT / name).read_text())
+            self.assertEqual(model["elements"], regular["elements"])
+            self.assertEqual(model["outliner"], regular["outliner"])
+            self.assertNotEqual(model["textures"][0]["source"], regular["textures"][0]["source"])
+
+    def test_epic_palette_is_plum_and_gold_not_blue(self):
+        image = Image.open(ROOT / self.texture_name).convert("RGB")
+        # A warm palette has no blue-dominant pixels, including its treasure.
+        red, _, blue = image.split()
+        self.assertIsNone(ImageChops.subtract(blue, red).getbbox())
+        wood = image.getpixel((32, 32))
+        gold = image.getpixel((32, 96))
+        self.assertGreater(wood[0], wood[1] + 30)
+        self.assertGreater(wood[2], wood[1] + 30)
+        self.assertGreater(gold[0], gold[1])
+        self.assertGreater(gold[1], gold[2])
 
 
 if __name__ == "__main__":

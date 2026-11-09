@@ -1,4 +1,4 @@
-"""Generate the two editable, textured chest models and their download archive."""
+"""Generate Regular and Epic chest poses, textures and download archives."""
 
 import base64
 import io
@@ -44,6 +44,31 @@ MATERIALS = {
     "lining": (29, 65, 64),
 }
 NAMES = list(MATERIALS)
+EPIC_MATERIALS = {
+    "oak_honey": (127, 43, 111),
+    "oak_warm": (147, 55, 131),
+    "oak_light": (166, 69, 147),
+    "oak_shade": (101, 31, 88),
+    "oak_amber": (140, 45, 122),
+    "oak_end": (124, 40, 108),
+    "inside": (69, 26, 54),
+    "wood_edge": (91, 28, 76),
+    "brass": (215, 164, 92),
+    "brass_light": (250, 214, 148),
+    "brass_dark": (139, 94, 47),
+    "brass_edge": (255, 232, 183),
+    "iron": (48, 32, 42),
+    "iron_light": (89, 61, 76),
+    "keyhole": (24, 19, 21),
+    "leather": (75, 29, 48),
+    "teal": (223, 118, 32),
+    "teal_light": (255, 205, 95),
+    "teal_dark": (119, 53, 20),
+    "violet": (189, 43, 85),
+    "violet_light": (255, 127, 151),
+    "violet_dark": (90, 20, 45),
+    "lining": (60, 22, 43),
+}
 
 
 def uid(name):
@@ -54,9 +79,11 @@ def shade(rgb, amount):
     return tuple(max(0, min(255, round(c + amount))) for c in rgb)
 
 
-def atlas():
+def atlas(epic=False):
     image = Image.new("RGB", (SIZE, SIZE), (34, 30, 28))
     for index, (name, base) in enumerate(MATERIALS.items()):
+        if epic:
+            base = EPIC_MATERIALS.get(name, base)
         rng = random.Random(490 + index)
         tile = Image.new("RGB", (TILE, TILE))
         wood = name.startswith("oak") or name in ("inside", "wood_edge")
@@ -237,7 +264,7 @@ class Model:
         self.solid("lid", name, vertices, faces, material,
                    {i: edge or material for i in (1, 2, 3, 4, 5)})
 
-    def export(self, opened, texture):
+    def export(self, opened, texture, epic=False):
         outliner = []
         for name, children in self.groups.items():
             outliner.append({
@@ -248,11 +275,12 @@ class Model:
             })
         return {
             "meta": {"format_version": "4.10", "model_format": "free", "box_uv": False},
-            "name": "Regular_chest_open" if opened else "Regular_chest",
+            "name": ("Epic_chest" if epic else "Regular_chest") + ("_open" if opened else ""),
             "resolution": {"width": SIZE, "height": SIZE},
             "elements": self.elements, "outliner": outliner,
             "textures": [{
-                "name": "chest_atlas.png", "id": "0", "uuid": uid("atlas"),
+                "name": "epic_chest_atlas.png" if epic else "chest_atlas.png",
+                "id": "0", "uuid": uid("epic_atlas" if epic else "atlas"),
                 "width": SIZE, "height": SIZE, "uv_width": SIZE, "uv_height": SIZE,
                 "render_mode": "default", "render_sides": "front",
                 "internal": True, "saved": True, "visible": True,
@@ -430,20 +458,25 @@ def build():
 
 
 def main():
-    texture = atlas()
-    (ROOT / "chest_atlas.png").write_bytes(texture)
     model = build()
-    names = []
-    for opened in (False, True):
-        name = f"Regular_chest{'_open' if opened else ''}.bbmodel"
-        (ROOT / name).write_text(json.dumps(model.export(opened, texture), indent=2) + "\n", encoding="utf-8")
-        names.append(name)
-    with zipfile.ZipFile(ROOT / "Regular_chest.zip", "w", zipfile.ZIP_DEFLATED) as archive:
-        for name in names + ["chest_atlas.png", "preview.png", "README.md"]:
-            entry = zipfile.ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0))
-            entry.compress_type = zipfile.ZIP_DEFLATED
-            archive.writestr(entry, (ROOT / name).read_bytes())
-    print(f"Generated two poses with {len(model.elements)} editable parts each.")
+    for epic in (False, True):
+        prefix = "Epic_chest" if epic else "Regular_chest"
+        texture_name = "epic_chest_atlas.png" if epic else "chest_atlas.png"
+        preview_name = "epic_preview.png" if epic else "preview.png"
+        texture = atlas(epic)
+        (ROOT / texture_name).write_bytes(texture)
+        names = []
+        for opened in (False, True):
+            name = f"{prefix}{'_open' if opened else ''}.bbmodel"
+            data = model.export(opened, texture, epic)
+            (ROOT / name).write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+            names.append(name)
+        with zipfile.ZipFile(ROOT / f"{prefix}.zip", "w", zipfile.ZIP_DEFLATED) as archive:
+            for name in names + [texture_name, preview_name, "README.md"]:
+                entry = zipfile.ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0))
+                entry.compress_type = zipfile.ZIP_DEFLATED
+                archive.writestr(entry, (ROOT / name).read_bytes())
+    print(f"Generated Regular and Epic poses with {len(model.elements)} editable parts each.")
 
 
 if __name__ == "__main__":
