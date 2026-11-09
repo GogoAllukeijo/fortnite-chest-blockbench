@@ -62,6 +62,7 @@ class ChestModelsTest(unittest.TestCase):
     def test_embedded_texture_matches_atlas(self):
         texture = (ROOT / self.texture_name).read_bytes()
         for model in self.models:
+            self.assertEqual(len(model["textures"]), 2)
             self.assertEqual(model["textures"][0]["name"], self.texture_name)
             self.assertEqual(model["meta"]["model_format"], "free")
             self.assertEqual(model["resolution"], {"width": 512, "height": 512})
@@ -75,7 +76,7 @@ class ChestModelsTest(unittest.TestCase):
                 if element["type"] == "cube":
                     self.assertTrue(all(b > a for a, b in zip(element["from"], element["to"])))
                     for face in element["faces"].values():
-                        self.assertEqual(face["texture"], 0)
+                        self.assertIn(face["texture"], (0, 1))
                         self.assertTrue(all(math.isfinite(v) and 0 <= v <= 512 for v in face["uv"]))
                     continue
                 vertices = element["vertices"]
@@ -120,7 +121,7 @@ class ChestModelsTest(unittest.TestCase):
         with zipfile.ZipFile(ROOT / f"{self.prefix}.zip") as archive:
             self.assertIsNone(archive.testzip())
             expected = [f"{self.prefix}.bbmodel", f"{self.prefix}_open.bbmodel",
-                        self.texture_name, self.preview_name, "README.md"]
+                        self.texture_name, f"{self.prefix}_loot.png", self.preview_name, "README.md"]
             self.assertEqual(sorted(archive.namelist()), sorted(expected))
             for name in expected:
                 self.assertEqual(archive.read(name), (ROOT / name).read_bytes())
@@ -130,6 +131,35 @@ class ChestModelsTest(unittest.TestCase):
                          hashlib.sha256((ROOT / self.texture_name).read_bytes()).digest())
         generated = gen.build().export(False, gen.atlas(self.epic), self.epic)
         self.assertEqual(generated, self.models[0])
+
+    def test_loot_png_is_embedded_opaque_and_reproducible(self):
+        expected = (ROOT / f"{self.prefix}_loot.png").read_bytes()
+        self.assertEqual(expected, gen.loot_texture(self.epic))
+        for model in self.models:
+            texture = model["textures"][1]
+            self.assertEqual(texture["name"], f"{self.prefix}_loot.png")
+            data = base64.b64decode(texture["source"].split(",", 1)[1])
+            self.assertEqual(data, expected)
+            image = Image.open(io.BytesIO(data))
+            self.assertEqual(image.size, (512, 320))
+            self.assertEqual(image.convert("RGBA").getchannel("A").getextrema(), (255, 255))
+            self.assertEqual((texture["uv_width"], texture["uv_height"]), (512, 512))
+
+    def test_treasure_fills_the_opening_just_below_rim(self):
+        for model in self.models:
+            fill = next(e for e in model["elements"] if e["name"] == "treasure_fill")
+            self.assertEqual(fill["faces"]["up"], {"uv": [0, 0, 512, 512], "texture": 1})
+            self.assertGreaterEqual(fill["to"][1], 11)
+            self.assertLess(fill["to"][1], 11.2)
+            for axis, opening, wall in ((0, 11.7, 11.8), (2, 7.3, 7.45)):
+                self.assertLessEqual(fill["from"][axis], -opening)
+                self.assertGreaterEqual(fill["to"][axis], opening)
+                self.assertGreater(fill["from"][axis], -wall)
+                self.assertLess(fill["to"][axis], wall)
+            parent = next(g for g in model["outliner"] if g["name"] == "treasure")
+            self.assertIn(fill["uuid"], parent["children"])
+            self.assertFalse(any(e["name"].startswith(("coin_stack_", "loose_coin_", "cut_crystal_"))
+                                 for e in model["elements"]))
 
 
 class EpicChestModelsTest(ChestModelsTest):
@@ -157,6 +187,9 @@ class EpicChestModelsTest(ChestModelsTest):
         self.assertGreater(wood[2], wood[1] + 30)
         self.assertGreater(gold[0], gold[1])
         self.assertGreater(gold[1], gold[2])
+        loot = Image.open(ROOT / f"{self.prefix}_loot.png").convert("RGB")
+        red, _, blue = loot.split()
+        self.assertIsNone(ImageChops.subtract(blue, red).getbbox())
 
 
 if __name__ == "__main__":

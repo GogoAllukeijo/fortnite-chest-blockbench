@@ -9,7 +9,7 @@ import random
 import uuid
 import zipfile
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 
 
 ROOT = Path(__file__).resolve().parent
@@ -139,6 +139,95 @@ def uv_bounds(material):
     index = NAMES.index(material)
     x, y = index % 8 * TILE, index // 8 * TILE
     return [x + 2, y + 2, x + 62, y + 62]
+
+
+def loot_texture(epic=False):
+    """Paint a dense, opaque treasure pile in the opening's aspect ratio."""
+    scale = 3
+    width, height = 512, 320
+    rng = random.Random(901)
+    image = Image.new("RGB", (width*scale, height*scale), (100, 54, 18))
+    draw = ImageDraw.Draw(image)
+
+    def box(x0, y0, x1, y1):
+        return tuple(round(v*scale) for v in (x0, y0, x1, y1))
+
+    def points(vertices):
+        return [(round(x*scale), round(y*scale)) for x, y in vertices]
+
+    def coin(x, y, radius):
+        ry = radius*rng.uniform(.8, 1)
+        tone = rng.choice(((223, 157, 41), (240, 178, 52), (204, 132, 30),
+                           (245, 193, 75), (224, 161, 48)))
+        draw.ellipse(box(x-radius-2, y-ry+3, x+radius+2, y+ry+6), fill=(82, 43, 16))
+        draw.ellipse(box(x-radius, y-ry+2, x+radius, y+ry+4), fill=(143, 83, 22))
+        draw.ellipse(box(x-radius, y-ry, x+radius, y+ry), fill=tone,
+                     outline=(139, 86, 23), width=scale)
+        draw.arc(box(x-radius+1, y-ry+1, x+radius-1, y+ry-1), 190, 310,
+                 fill=(255, 227, 140), width=2*scale)
+        draw.ellipse(box(x-radius*.72, y-ry*.72, x+radius*.72, y+ry*.72),
+                     outline=shade(tone, -28), width=scale)
+        r = radius*.38
+        diamond = [(x, y-r), (x+r*.7, y), (x, y+r), (x-r*.7, y)]
+        draw.polygon(points(diamond), fill=shade(tone, -21))
+        draw.line(points(diamond[:2]), fill=shade(tone, 35), width=scale)
+        for angle in (30, 65, 110, 150):
+            a = math.radians(angle)
+            px, py = x+radius*.87*math.cos(a), y+ry*.87*math.sin(a)
+            draw.line(points([(px, py), (px, py+2)]), fill=(162, 103, 27), width=scale)
+
+    centers = [(x+rng.uniform(-9, 9), y+rng.uniform(-9, 9))
+               for y in range(-10, height+24, 23) for x in range(-10, width+24, 24)]
+    rng.shuffle(centers)
+    for x, y in centers:
+        coin(x, y, rng.uniform(13, 22))
+
+    def gem(x, y, radius, material, angle):
+        palette = EPIC_MATERIALS if epic else MATERIALS
+        base = palette[material]
+        light, dark = palette[material+"_light"], palette[material+"_dark"]
+        ca, sa = math.cos(angle), math.sin(angle)
+
+        def transform(u, v):
+            return (x+radius*(u*ca-v*sa), y+radius*(u*sa+v*ca))
+
+        outer = [transform(u, v) for u, v in
+                 ((-.45, -1), (.45, -1), (.85, -.3), (.5, .85), (-.5, .85), (-.85, -.3))]
+        inner = [transform(u, v) for u, v in
+                 ((-.22, -.5), (.22, -.5), (.4, -.12), (.24, .38), (-.24, .38), (-.4, -.12))]
+        shadow = Image.new("RGBA", image.size)
+        ImageDraw.Draw(shadow).polygon(points([(u+3, v+5) for u, v in outer]),
+                                      fill=(38, 19, 17, 200))
+        shadow = shadow.filter(ImageFilter.GaussianBlur(2*scale))
+        image.paste(shadow, (0, 0), shadow)
+        draw.polygon(points(outer), fill=dark)
+        shades = [light, base, dark, shade(dark, 12), base, shade(light, -12)]
+        for i in range(6):
+            j = (i+1) % 6
+            draw.polygon(points([outer[i], outer[j], inner[j], inner[i]]), fill=shades[i])
+        draw.polygon(points(inner), fill=base)
+        draw.line(points([outer[5], outer[0], outer[1]]), fill=shade(light, 28), width=scale)
+        draw.line(points([inner[5], inner[0], inner[1], inner[2]]), fill=light, width=scale)
+
+    for x, y, r, color, angle in ((93, 88, 27, "teal", -.38),
+                                  (277, 67, 23, "violet", .5),
+                                  (420, 116, 28, "teal", .34),
+                                  (188, 219, 31, "violet", -.4),
+                                  (350, 235, 24, "teal", -.65),
+                                  (59, 260, 20, "violet", .25)):
+        gem(x, y, r, color, angle)
+
+    image = image.resize((width, height), Image.Resampling.LANCZOS)
+    # Darkened edges sit naturally beneath the rim rather than looking like a decal.
+    pixels = image.load()
+    for y in range(height):
+        for x in range(width):
+            distance = min(x, width-1-x, y, height-1-y)
+            factor = .72 + .28*min(distance/18, 1)
+            pixels[x, y] = tuple(round(v*factor) for v in pixels[x, y])
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
 
 
 def sub(a, b):
@@ -285,6 +374,13 @@ class Model:
                 "render_mode": "default", "render_sides": "front",
                 "internal": True, "saved": True, "visible": True,
                 "source": "data:image/png;base64," + base64.b64encode(texture).decode(),
+            }, {
+                "name": ("Epic_chest" if epic else "Regular_chest") + "_loot.png",
+                "id": "1", "uuid": uid("epic_loot" if epic else "regular_loot"),
+                "width": 512, "height": 320, "uv_width": SIZE, "uv_height": SIZE,
+                "render_mode": "default", "render_sides": "front",
+                "internal": True, "saved": True, "visible": True,
+                "source": "data:image/png;base64," + base64.b64encode(loot_texture(epic)).decode(),
             }],
         }
 
@@ -420,40 +516,8 @@ def build():
     m.rivet("lid", "clasp_hinge_pin", [0, 12.65, 9.38], [0, 0, 1], .23)
 
     m.cube("treasure", "velvet_lining", [-11.6, 2.26, -7.2], [11.6, 2.43, 7.2], "lining")
-    # Stacks sit on the lining; the same contents exist in both poses.
-    rng = random.Random(17)
-    for stack, (x, z, count) in enumerate(((-7, -3.2, 11), (-4.2, -3.9, 15),
-                                         (-1.2, -4, 19), (1.7, -3.5, 16),
-                                         (4.5, -3.2, 13), (7.2, -2.8, 9),
-                                         (-6, -.2, 8), (-3, -.3, 12), (0, -.5, 14),
-                                         (3, -.2, 10), (6, .2, 7), (-2.1, 2.4, 6),
-                                         (1.1, 2.6, 5))):
-        for j in range(count):
-            m.cylinder("treasure", f"coin_stack_{stack:02}_{j:02}",
-                       [x+rng.uniform(-.12, .12), 2.62+j*.33, z+rng.uniform(-.12, .12)],
-                       [0, 1, 0], 1.08, .32, "coin_edge", "coin_face", 10)
-    for i in range(14):
-        x, z = rng.uniform(-9.8, 9.8), rng.uniform(4.5, 6.1)
-        m.cylinder("treasure", f"loose_coin_{i:02}", [x, 2.62+(i%3)*.17, z], [0, 1, 0],
-                   .75, .25, "coin_edge", "coin_face", 10)
-    for i, (x, y, z, scale, color) in enumerate(((-8.9, 2.45, 2.2, 1.8, "teal"),
-                                               (7.7, 2.45, 3.2, 1.7, "violet"),
-                                               (-5, 5.15, -3, 1, "teal"),
-                                               (4.4, 6.7, -3.1, .9, "violet"))):
-        vertices = [[x, y, z]]
-        for height, radius in ((.55, 1), (1.8, .63)):
-            for k in range(6):
-                t = math.pi*k/3+.2
-                vertices.append([x+radius*scale*math.cos(t), y+height*scale,
-                                 z+radius*scale*math.sin(t)])
-        vertices.append([x+.15*scale, y+2.35*scale, z-.1*scale])
-        faces, materials = [], {}
-        for k in range(6):
-            faces += [[0, 1+k, 1+(k+1)%6], [1+k, 7+k, 7+(k+1)%6, 1+(k+1)%6],
-                      [7+k, 13, 7+(k+1)%6]]
-            for j in range(3):
-                materials[3*k+j] = color + ("_light" if k%3 == 0 else "_dark" if k%3 == 2 else "")
-        m.solid("treasure", f"cut_crystal_{i+1}", vertices, faces, color, materials)
+    m.cube("treasure", "treasure_fill", [-11.78, 2.43, -7.43], [11.78, 11.15, 7.43], "coin_edge")
+    m.elements[-1]["faces"]["up"] = {"uv": [0, 0, SIZE, SIZE], "texture": 1}
     return m
 
 
@@ -463,8 +527,10 @@ def main():
         prefix = "Epic_chest" if epic else "Regular_chest"
         texture_name = "epic_chest_atlas.png" if epic else "chest_atlas.png"
         preview_name = "epic_preview.png" if epic else "preview.png"
+        loot_name = f"{prefix}_loot.png"
         texture = atlas(epic)
         (ROOT / texture_name).write_bytes(texture)
+        (ROOT / loot_name).write_bytes(loot_texture(epic))
         names = []
         for opened in (False, True):
             name = f"{prefix}{'_open' if opened else ''}.bbmodel"
@@ -472,7 +538,7 @@ def main():
             (ROOT / name).write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
             names.append(name)
         with zipfile.ZipFile(ROOT / f"{prefix}.zip", "w", zipfile.ZIP_DEFLATED) as archive:
-            for name in names + [texture_name, preview_name, "README.md"]:
+            for name in names + [texture_name, loot_name, preview_name, "README.md"]:
                 entry = zipfile.ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0))
                 entry.compress_type = zipfile.ZIP_DEFLATED
                 archive.writestr(entry, (ROOT / name).read_bytes())

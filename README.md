@@ -14,6 +14,7 @@ Not an official Fortnite asset and not extracted from any game.
 - `Regular_chest.bbmodel` - closed chest.
 - `Regular_chest_open.bbmodel` - the same chest with its lid opened 105 degrees.
 - `chest_atlas.png` - hand-authored procedural 512 x 512 wood, brass and treasure atlas.
+- `Regular_chest_loot.png` - 512 x 320 painted coin-and-gem pile filling the opening.
 - `preview.png` - both actual models rendered in Blockbench.
 
 ### Epic_chest
@@ -25,12 +26,13 @@ Not an official Fortnite asset and not extracted from any game.
 - `Epic_chest.bbmodel` - closed Epic chest.
 - `Epic_chest_open.bbmodel` - open Epic chest.
 - `epic_chest_atlas.png` - embedded 512 x 512 Epic texture atlas.
+- `Epic_chest_loot.png` - 512 x 320 gold, amber and ruby treasure pile.
 - `epic_preview.png` - both Epic poses rendered in Blockbench.
 
 Epic uses rich plum-purple wood, warm champagne-gold hardware, burgundy lining
 and amber/ruby treasure. There are no blue surfaces or light beams.
 It preserves Regular's geometry, hinge, editing groups and level of detail.
-Regular's models and colors are unchanged. Each ZIP contains only its own variant.
+Both variants keep their exterior design and colors. Each ZIP contains only its own variant.
 
 **Suomeksi:** Pura ZIP ja avaa haluamasi `.bbmodel` Blockbenchissa kohdasta
 File > Open Model. Tekstuurit ovat valmiiksi mallin sisalla. Molemmat mallit
@@ -51,11 +53,15 @@ set its X rotation to `0` to close it or `-105` to open it.
 - Wide oak body with individual grain-textured boards, an actual floor and hollow interior.
 - Thin, faceted barrel lid with an inner lining, end panels and continuous brass straps.
 - Brass edging, corner guards, rivets, a recessed keyhole, hinges and two drop handles.
-- Dark velvet lining, stacked stamped coins and small faceted crystals.
+- A dense, painted PNG treasure surface just below the rim, over a solid interior fill.
 - No beam, opaque glow column or oversized ornament on the lid.
 
 The `treasure` group can be hidden or removed for an empty chest.
 The textures use painted highlights, not an emissive shader.
+The old individual coin stacks have been replaced by a single lightweight `treasure_fill`
+element. Its upper face displays the complete loot PNG without tiling. The texture is
+embedded in both poses and also included separately in the ZIP for editing.
+Its UV canvas is 512 x 512, mapping the entire 512 x 320 image onto the rectangular opening.
 
 ## Regenerate
 
@@ -68,5 +74,5 @@ python -m unittest -v test_models.py
 ```
 
 The generator writes beside itself, uses fixed seeds and stable UUIDs, and
-rebuilds each variant's ZIP with its two models, atlas, saved preview and this README.
+rebuilds each variant's ZIP with its two models, atlas, loot PNG, saved preview and this README.
 Previews are captured separately in Blockbench; the generator does not rerender them.
