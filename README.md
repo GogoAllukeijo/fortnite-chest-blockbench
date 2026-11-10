@@ -1,4 +1,19 @@
-# Regular_chest & Epic_chest - Blockbench
+# Blockbench assets: Chests & SkyManta
+
+## SkyManta - original flying vehicle
+
+[Download SkyManta (ZIP)](https://github.com/GogoAllukeijo/fortnite-chest-blockbench/raw/refs/heads/main/SkyManta.zip)
+
+![SkyManta rendered in Blockbench](https://raw.githubusercontent.com/GogoAllukeijo/fortnite-chest-blockbench/main/SkyManta_preview.png)
+
+An original ivory-and-orange aerial courier with four animated lift fans,
+a panoramic cockpit, cargo hatch, twin tail fins and landing skids.
+No bus, balloon, Fortnite branding or extracted game assets.
+Open `SkyManta.bbmodel`, then **Animate > rotors_spin > Play**.
+See [SkyManta_README.md](SkyManta_README.md) for usage and regeneration instructions.
+Flight physics and controls are not included; this is an editable visual asset.
+
+## Regular_chest & Epic_chest
 
 Original, stylized wooden loot chest inspired by colorful adventure games.
 Not an official Fortnite asset and not extracted from any game.
